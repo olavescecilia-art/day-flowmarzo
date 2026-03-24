@@ -1,0 +1,9 @@
+{
+  "name": "FlowDay",
+  "description": "A minimalist, calm productivity app for managing tasks, routines, and emotional well-being.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "notifications"
+  ]
+}

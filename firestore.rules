@@ -1,0 +1,317 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - userId: string (required)
+    //   - displayName: string (optional)
+    //   - email: string (required)
+    //   - rachaActual: number (optional)
+    //   - focoTotalMinutos: number (optional)
+    //   - ultimaActividad: number (optional)
+    //   - paleta: string (optional)
+    //   - tema: string (optional)
+    //   - role: string (optional, 'admin' | 'user')
+    //
+    // Collection: tasks
+    // Document ID: taskId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombre: string (required, max 100)
+    //   - duracion_minutos: number (required, positive)
+    //   - categoria: string (required)
+    //   - prioridad: number (required, 1-4)
+    //   - estado: string (required, 'pendiente' | 'completa')
+    //   - esHabito: bool (optional)
+    //   - notas: string (optional, max 1000)
+    //   - creadaEn: number (required)
+    //
+    // Collection: timer_sessions
+    // Document ID: sessionId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombreActividad: string (required)
+    //   - categoria: string (required)
+    //   - duracionSegundos: number (required, positive)
+    //   - puntuacion: number (optional, 1-10)
+    //   - sentimientoTipo: string (optional, 'disfrutable' | 'neutral' | 'arrepentimiento')
+    //   - fecha: string (required, YYYY-MM-DD)
+    //   - creadaEn: number (required)
+    //
+    // Collection: entries
+    // Document ID: entryId
+    // Fields:
+    //   - userId: string (required)
+    //   - diarioId: string (optional)
+    //   - titulo: string (required, max 200)
+    //   - contenidoHtml: string (optional, max 10000)
+    //   - emociones: list (optional)
+    //   - balanceDia: number (optional)
+    //   - tareasVinculadas: list (optional)
+    //   - sesionesVinculadas: list (optional)
+    //   - fotos: list (optional)
+    //   - creadaEn: number (required)
+    //   - editadaEn: number (required)
+    //
+    // Collection: presets
+    // Document ID: presetId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombre: string (required)
+    //   - duracion_minutos: number (required)
+    //   - categoria: string (required)
+    //   - icono: string (optional)
+    //   - creadaEn: number (required)
+    //
+    // Collection: projects
+    // Document ID: projectId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombre: string (required)
+    //   - color: string (optional)
+    //   - estado: string (required, 'activo' | 'completado' | 'archivado')
+    //   - creadaEn: number (required)
+    //
+    // Collection: categories
+    // Document ID: categoryId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombre: string (required)
+    //   - icono: string (required)
+    //   - color: string (optional)
+    //   - creadaEn: number (required)
+    //
+    // Collection: routines
+    // Document ID: routineId
+    // Fields:
+    //   - userId: string (required)
+    //   - nombre: string (required)
+    //   - tareasIds: list (required)
+    //   - repeticion: map (required)
+    //   - creadaEn: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+          (request.auth.token.email == "olavescecilia@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return (data.email == "" || isValidEmail(data.email)) &&
+             (!('uid' in data) || data.uid is string) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('role' in data) || data.role in ['admin', 'user']) &&
+             (!('rachaActual' in data) || data.rachaActual is number) &&
+             (!('focoTotalMinutos' in data) || data.focoTotalMinutos is number) &&
+             (!('palette' in data) || data.palette is string) &&
+             (!('theme' in data) || data.theme is string) &&
+             (!('timezone' in data) || data.timezone is string) &&
+             (!('notifications' in data) || data.notifications is map) &&
+             (!('createdAt' in data) || data.createdAt is number);
+    }
+
+    function isValidTask(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombre is string && data.nombre.size() > 0 && data.nombre.size() <= 100 &&
+             data.duracion_minutos is number && data.duracion_minutos >= 0 &&
+             data.categoria is string &&
+             data.prioridad is number && data.prioridad >= 1 && data.prioridad <= 4 &&
+             data.estado in ['pendiente', 'completa', 'saltada'] &&
+             data.creadaEn is number &&
+             (!('subcategoria' in data) || data.subcategoria is string) &&
+             (!('proyectoId' in data) || data.proyectoId is string) &&
+             (!('fecha' in data) || data.fecha is string) &&
+             (!('hora' in data) || data.hora is string) &&
+             (!('turno' in data) || data.turno is string) &&
+             (!('repeticion' in data) || data.repeticion is map) &&
+             (!('esHabito' in data) || data.esHabito is bool) &&
+             (!('rachaActual' in data) || data.rachaActual is number) &&
+             (!('mejorRacha' in data) || data.mejorRacha is number) &&
+             (!('totalCompletadas' in data) || data.totalCompletadas is number) &&
+             (!('metaRepeticiones' in data) || data.metaRepeticiones is number) &&
+             (!('recompensa' in data) || data.recompensa is string) &&
+             (!('notas' in data) || (data.notas is string && data.notas.size() <= 1000)) &&
+             (!('completadaEn' in data) || data.completadaEn is number) &&
+             (!('sentimientoValor' in data) || data.sentimientoValor is number) &&
+             (!('sentimientoTipo' in data) || data.sentimientoTipo in ['disfrutable', 'neutral', 'arrepentimiento']);
+    }
+
+    function isValidTimerSession(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombreActividad is string && data.nombreActividad.size() > 0 &&
+             data.duracionSegundos is number && data.duracionSegundos >= 0 &&
+             data.fecha is string && isValidDateString(data.fecha) &&
+             data.creadaEn is number &&
+             (!('categoria' in data) || data.categoria is string) &&
+             (!('puntuacion' in data) || data.puntuacion is number) &&
+             (!('sentimientoTipo' in data) || data.sentimientoTipo in ['disfrutable', 'neutral', 'arrepentimiento']);
+    }
+
+    function isValidRoutine(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombre is string && data.nombre.size() > 0 &&
+             data.tareasIds is list &&
+             data.repeticion is map &&
+             data.creadaEn is number;
+    }
+
+    function isValidDiaryEntry(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             (!('diarioId' in data) || data.diarioId is string) &&
+             (!('titulo' in data) || (data.titulo is string && data.titulo.size() <= 200)) &&
+             (!('contenidoHtml' in data) || (data.contenidoHtml is string && data.contenidoHtml.size() <= 10000)) &&
+             data.creadaEn is number &&
+             (!('editadaEn' in data) || data.editadaEn is number) &&
+             (!('emociones' in data) || data.emociones is list) &&
+             (!('balanceDia' in data) || data.balanceDia is number) &&
+             (!('tareasVinculadas' in data) || data.tareasVinculadas is list) &&
+             (!('sesionesVinculadas' in data) || data.sesionesVinculadas is list) &&
+             (!('fotos' in data) || data.fotos is list);
+    }
+
+    function isValidPreset(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombre is string && data.nombre.size() > 0 &&
+             data.creadaEn is number &&
+             (!('duracion_minutos' in data) || data.duracion_minutos is number) &&
+             (!('categoria' in data) || data.categoria is string) &&
+             (!('icono' in data) || data.icono is string);
+    }
+
+    function isValidProject(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombre is string && data.nombre.size() > 0 &&
+             data.creadaEn is number &&
+             (!('estado' in data) || data.estado in ['activo', 'completado', 'archivado']) &&
+             (!('color' in data) || data.color is string);
+    }
+
+    function isValidCategory(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.nombre is string && data.nombre.size() > 0 &&
+             data.icono is string &&
+             data.creadaEn is number &&
+             (!('color' in data) || data.color is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isDocOwner() && isValidTask(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /timer_sessions/{sessionId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidTimerSession(request.resource.data);
+      allow update: if isDocOwner() && isValidTimerSession(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /entries/{entryId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidDiaryEntry(request.resource.data);
+      allow update: if isDocOwner() && isValidDiaryEntry(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /presets/{presetId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidPreset(request.resource.data);
+      allow update: if isDocOwner() && isValidPreset(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      allow update: if isDocOwner() && isValidProject(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidCategory(request.resource.data);
+      allow update: if isDocOwner() && isValidCategory(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /routines/{routineId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidRoutine(request.resource.data);
+      allow update: if isDocOwner() && isValidRoutine(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /_connection_test_/{docId} {
+      allow read: if true;
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

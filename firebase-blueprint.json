@@ -1,0 +1,209 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile data including preferences and stats.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "timezone": { "type": "string" },
+        "palette": { "type": "string" },
+        "theme": { "type": "string" },
+        "notifications": { "type": "object" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "rachaActual": { "type": "integer" },
+        "focoTotalMinutos": { "type": "integer" },
+        "ultimaActividad": { "type": "integer" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["uid"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task or habit created by the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "duracion_minutos": { "type": "integer" },
+        "categoria": { "type": "string" },
+        "subcategoria": { "type": "string" },
+        "proyectoId": { "type": "string" },
+        "prioridad": { "type": "integer" },
+        "fecha": { "type": "string" },
+        "hora": { "type": "string" },
+        "turno": { "type": "string" },
+        "estado": { "type": "string", "enum": ["pendiente", "completa", "saltada"] },
+        "esHabito": { "type": "boolean" },
+        "rachaActual": { "type": "integer" },
+        "mejorRacha": { "type": "integer" },
+        "totalCompletadas": { "type": "integer" },
+        "notas": { "type": "string" },
+        "creadaEn": { "type": "integer" },
+        "completadaEn": { "type": "integer" },
+        "sentimientoValor": { "type": "integer" },
+        "sentimientoTipo": { "type": "string", "enum": ["disfrutable", "neutral", "arrepentimiento"] }
+      },
+      "required": ["userId", "nombre", "duracion_minutos", "categoria", "prioridad", "estado", "creadaEn"]
+    },
+    "TimerSession": {
+      "title": "Timer Session",
+      "description": "A recorded timer session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombreActividad": { "type": "string" },
+        "categoria": { "type": "string" },
+        "duracionSegundos": { "type": "integer" },
+        "puntuacion": { "type": "integer" },
+        "sentimientoTipo": { "type": "string", "enum": ["disfrutable", "neutral", "arrepentimiento"] },
+        "fecha": { "type": "string" },
+        "creadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "nombreActividad", "duracionSegundos", "creadaEn"]
+    },
+    "DiaryEntry": {
+      "title": "Diary Entry",
+      "description": "A diary entry with emotions and linked tasks.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "diarioId": { "type": "string" },
+        "titulo": { "type": "string" },
+        "contenidoHtml": { "type": "string" },
+        "emociones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "emoji": { "type": "string" },
+              "nombre": { "type": "string" },
+              "tipo": { "type": "string" },
+              "intensidad": { "type": "integer" }
+            }
+          }
+        },
+        "balanceDia": { "type": "integer" },
+        "tareasVinculadas": { "type": "array", "items": { "type": "string" } },
+        "sesionesVinculadas": { "type": "array", "items": { "type": "string" } },
+        "fotos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "fecha": { "type": "integer" }
+            }
+          }
+        },
+        "creadaEn": { "type": "integer" },
+        "editadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "creadaEn"]
+    },
+    "Preset": {
+      "title": "Preset",
+      "description": "A reusable task or session template.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "duracion_minutos": { "type": "integer" },
+        "categoria": { "type": "string" },
+        "icono": { "type": "string" },
+        "creadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "nombre", "duracion_minutos", "creadaEn"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A collection of related tasks.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "color": { "type": "string" },
+        "estado": { "type": "string", "enum": ["activo", "completado", "archivado"] },
+        "creadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "nombre", "creadaEn"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A user-defined category for tasks.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "icono": { "type": "string" },
+        "color": { "type": "string" },
+        "creadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "nombre", "icono", "creadaEn"]
+    },
+    "Routine": {
+      "title": "Routine",
+      "description": "A group of tasks that repeat together.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "nombre": { "type": "string" },
+        "tareasIds": { "type": "array", "items": { "type": "string" } },
+        "repeticion": {
+          "type": "object",
+          "properties": {
+            "tipo": { "type": "string", "enum": ["diario", "semanal", "mensual", "personalizado"] },
+            "config": {
+              "type": "object",
+              "properties": {
+                "dias_semana": { "type": "array", "items": { "type": "integer" } },
+                "cada_n": { "type": "integer" },
+                "unidad": { "type": "string", "enum": ["dias", "semanas", "meses"] }
+              }
+            }
+          }
+        },
+        "creadaEn": { "type": "integer" }
+      },
+      "required": ["userId", "nombre", "repeticion", "creadaEn"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of tasks."
+    },
+    "/timer_sessions/{sessionId}": {
+      "schema": "TimerSession",
+      "description": "Collection of timer sessions."
+    },
+    "/entries/{entryId}": {
+      "schema": "DiaryEntry",
+      "description": "Collection of diary entries."
+    },
+    "/presets/{presetId}": {
+      "schema": "Preset",
+      "description": "Collection of task presets."
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of projects."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of user categories."
+    },
+    "/routines/{routineId}": {
+      "schema": "Routine",
+      "description": "Collection of routines."
+    }
+  }
+}
